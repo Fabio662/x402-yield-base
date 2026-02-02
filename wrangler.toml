@@ -1,0 +1,3 @@
+name = "x402-yield-base"
+main = "worker.js"
+compatibility_date = "2026-02-02"
