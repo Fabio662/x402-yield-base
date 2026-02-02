@@ -49,8 +49,7 @@ function generateX402Response(resource) {
   };
 }
 
-const HTML_PAGE = `
-<!DOCTYPE html>
+const HTML_PAGE = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -425,16 +424,14 @@ const HTML_PAGE = `
       if (data.success && data.data && data.data.opportunities) {
         let html = '';
         data.data.opportunities.forEach(opp => {
-          html += \`
-            <div class="result-item">
-              <div class="result-protocol">\${opp.protocol}</div>
-              <div class="result-details">
-                <span>APY: <strong>\${opp.apy}</strong></span>
-                <span>TVL: <strong>\${opp.tvl}</strong></span>
-                <span>Risk: <strong>\${opp.risk}</strong></span>
-              </div>
-            </div>
-          \`;
+          html += '<div class="result-item">' +
+            '<div class="result-protocol">' + opp.protocol + '</div>' +
+            '<div class="result-details">' +
+            '<span>APY: <strong>' + opp.apy + '</strong></span>' +
+            '<span>TVL: <strong>' + opp.tvl + '</strong></span>' +
+            '<span>Risk: <strong>' + opp.risk + '</strong></span>' +
+            '</div>' +
+            '</div>';
         });
         resultData.innerHTML = html;
         resultSection.classList.add('show');
@@ -445,8 +442,7 @@ const HTML_PAGE = `
     }
   </script>
 </body>
-</html>
-`;
+</html>`;
 
 export default {
   async fetch(request, env, ctx) {
