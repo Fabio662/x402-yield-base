@@ -89,16 +89,34 @@ export default {
     if (path === '/' || path === '/yield-opportunities') {
       const paymentHeader = request.headers.get('X-Payment');
 
-      if (!paymentHeader) {
-        // Return 402 Payment Required
-        const x402Response = generateX402Response(path);
-        return new Response(JSON.stringify(x402Response), {
-          status: 402,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-            'X-Payment-Required': 'true',
-            'X-Payment-Protocol': 'x402'
+    return new Response(`
+  <style>
+    body { font-family:sans-serif; background:#000; color:#0f0; text-align:center; padding:100px; }
+    h2 { font-size:36px; margin:0; }
+    p { font-size:18px; margin:20px 0; color:#aaa; }
+    .icon { font-size:60px; margin:20px 0; }
+    button { background:#0f0; color:#000; border:none; padding:10px 20px; font-weight:bold; cursor:pointer; }
+  </style>
+  <div>
+    <div class="icon">🔒</div>
+    <h2>YieldAgent</h2>
+    <p>Live</p>
+    <h2>Unlock Yield Data</h2>
+    <p>Pay once with USDC to access real-time yield opportunities from top Base DeFi protocols.</p>
+    <p>Morpho 8.02%<br>Aave 7.4%<br>Moonwell 6.8%<br>ExtraFi 9.1%</p>
+    <p>Cost<br>0.01 USDC<br>Network<br>Base Mainnet</p>
+    <p>Send to<br><strong>0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1</strong></p>
+    <p><button onclick="navigator.clipboard.writeText('0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1')">📋 Copy Address</button></p>
+    <p>Send 0.01 USDC to the address above, then call <br>GET / with header <code>X-Payment: {\"txHash\": \"your-tx-id\", \"amount\": 0.01}</code></p>
+  </div>
+`, {
+  headers: {
+    ...corsHeaders,
+    'Content-Type': 'text/html',
+    'X-Payment-Required': 'true',
+    'X-Payment-Protocol': 'x402'
+  }
+});
           }
         });
       }
