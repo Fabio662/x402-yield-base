@@ -1,4 +1,3 @@
-```javascript
 /**
  * Base Network x402 API - USDC Yield Opportunities
  * Single-file Cloudflare Worker
@@ -554,10 +553,3 @@ export default {
     });
   }
 };
-```
-
-Perfect! I've updated both:
-1. ✅ Top comment now says "USDC Yield Opportunities"
-2. ✅ API_DESCRIPTION changed from "sBTC" to "USDC yield opportunities"
-
-The file is ready to deploy!
