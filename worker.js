@@ -1,16 +1,15 @@
 /**
- * NEAR Network x402 API - Liquid Staking Yield Opportunities
- * Single-file Cloudflare Worker
- * Accepts NEAR payments on NEAR network
+ * Base x402 Yield Agent
+ * Pay 0.01 USDC → unlock yields
  */
 
 const CONFIG = {
-  PAYMENT_ADDRESS: 'yieldagent.near',
-  PAYMENT_AMOUNT: '0.1',
-  PAYMENT_ASSET: 'NEAR',
-  NETWORK: 'near',
+  PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1',
+  PAYMENT_AMOUNT: '0.01',
+  PAYMENT_ASSET: 'USDC',
+  NETWORK: 'base',
   TIMEOUT_SECONDS: 3600,
-  API_DESCRIPTION: 'Access to real-time NEAR liquid staking yield opportunities',
+  API_DESCRIPTION: 'Live yields: Morpho, Aave, Moonwell, Seamless, ExtraFi',
   API_VERSION: 1
 };
 
@@ -18,369 +17,164 @@ const YIELD_DATA = {
   success: true,
   data: {
     opportunities: [
-      { id: 1, protocol: "RHEA", apy: "9.2%", risk: "Low", tvl: "$18M", asset: "NEAR" },
-      { id: 2, protocol: "Meta Pool", apy: "8.7%", risk: "Low", tvl: "$45M", asset: "NEAR" },
-      { id: 3, protocol: "Linear Protocol", apy: "8.5%", risk: "Low", tvl: "$32M", asset: "NEAR" }
+      { id: 1, protocol: "Morpho", apy: "8.02%", risk: "Low", tvl: "$45M", asset: "USDC" },
+      { id: 2, protocol: "Aave", apy: "7.5%", risk: "Low", tvl: "$120M", asset: "USDC" },
+      { id: 3, protocol: "Moonwell", apy: "6.8%", risk: "Low", tvl: "$85M", asset: "USDC" },
+      { id: 4, protocol: "Seamless Protocol", apy: "7.2%", risk: "Medium", tvl: "$55M", asset: "USDC" },
+      { id: 5, protocol: "ExtraFi", apy: "9.1%", risk: "Medium", tvl: "$12M", asset: "USDC" }
     ],
-    network: "NEAR",
+    network: "Base",
     lastUpdated: new Date().toISOString()
   }
 };
 
-function generateX402Response(resource) {
-  return {
-    x402Version: CONFIG.API_VERSION,
-    accepts: [{
-      scheme: "exact",
-      network: CONFIG.NETWORK,
-      maxAmountRequired: CONFIG.PAYMENT_AMOUNT,
-      resource: resource,
-      description: CONFIG.API_DESCRIPTION,
-      mimeType: "application/json",
-      payTo: CONFIG.PAYMENT_ADDRESS,
-      maxTimeoutSeconds: CONFIG.TIMEOUT_SECONDS,
-      asset: CONFIG.PAYMENT_ASSET
-    }]
-  };
-}
-
-function getHTMLPage() {
-  return `<!DOCTYPE html>
+const HTML_PAGE = `
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YieldAgent - NEAR Network</title>
+  <title>YieldAgent - Base</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #00C08B 0%, #005A46 100%);
-      min-height: 100vh;
+      background: #0a0e1a;
+      color: white;
+      font-family: -apple-system, sans-serif;
+      margin: 0;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
+      min-height: 100vh;
       padding: 20px;
-      color: white;
-    }
-    .container { max-width: 800px; width: 100%; }
-    .header { text-align: center; margin-bottom: 40px; }
-    .logo { font-size: 60px; margin-bottom: 20px; }
-    h1 { font-size: 48px; font-weight: 700; margin-bottom: 10px; }
-    .subtitle { font-size: 20px; opacity: 0.9; margin-bottom: 10px; }
-    .network-badge {
-      display: inline-block;
-      background: rgba(255, 255, 255, 0.2);
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 14px;
-      font-weight: 600;
-      margin-top: 10px;
     }
     .card {
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid #0052FF;
       border-radius: 20px;
       padding: 40px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      margin-bottom: 30px;
-    }
-    .yields-preview { margin: 30px 0; }
-    .yield-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 15px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 10px;
-      margin-bottom: 10px;
-    }
-    .protocol-name { font-weight: 600; font-size: 16px; }
-    .apy { font-size: 24px; font-weight: 700; color: #00FFA3; }
-    .payment-section {
-      margin: 30px 0;
-      padding: 25px;
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 15px;
-      border: 2px dashed rgba(255, 255, 255, 0.3);
-    }
-    .payment-details { text-align: center; }
-    .cost { font-size: 36px; font-weight: 700; color: #00FFA3; margin: 15px 0; }
-    .address-section { margin: 20px 0; }
-    .label { font-size: 14px; opacity: 0.8; margin-bottom: 8px; }
-    .address-container {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: rgba(0, 0, 0, 0.3);
-      padding: 15px;
-      border-radius: 10px;
-      margin-top: 10px;
-    }
-    .address {
-      flex: 1;
-      font-family: 'Courier New', monospace;
-      font-size: 14px;
-      word-break: break-all;
-    }
-    .copy-btn {
-      background: #00FFA3;
-      color: #005A46;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s;
-      white-space: nowrap;
-    }
-    .copy-btn:hover { background: #00DD8F; transform: scale(1.05); }
-    .try-agent-btn {
+      max-width: 700px;
       width: 100%;
-      background: linear-gradient(135deg, #00FFA3 0%, #00DD8F 100%);
-      color: #005A46;
-      border: none;
-      padding: 18px;
-      border-radius: 12px;
-      font-size: 18px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.3s;
-      margin-top: 20px;
     }
-    .try-agent-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 25px rgba(0, 255, 163, 0.3);
-    }
-    .instructions {
-      margin-top: 30px;
-      padding: 20px;
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 10px;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-    .instructions h3 { margin-bottom: 15px; font-size: 18px; }
-    .instructions ol { margin-left: 20px; }
-    .instructions li { margin-bottom: 10px; }
-    code {
-      background: rgba(0, 0, 0, 0.4);
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-family: 'Courier New', monospace;
-      font-size: 13px;
-    }
-    .footer { text-align: center; margin-top: 40px; opacity: 0.7; font-size: 14px; }
-    .result-section {
-      display: none;
-      margin-top: 20px;
-      padding: 20px;
-      background: rgba(0, 255, 163, 0.1);
-      border-radius: 10px;
-      border: 1px solid #00FFA3;
-    }
-    .result-section.show { display: block; }
-    .result-item {
+    .logo { font-size: 80px; margin-bottom: 20px; color: #0052FF; }
+    h1 { font-size: 48px; margin: 8px 0; }
+    .subtitle { font-size: 20px; color: #0052FF88; }
+    .yield-item {
+      display: flex; justify-content: space-between;
       padding: 15px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 8px;
-      margin-bottom: 10px;
+      margin: 6px 0;
+      background: rgba(0,82,255,0.08);
+      border-radius: 10px;
+      border: 1px solid #0052FFaa;
     }
-    .result-protocol { font-weight: 600; font-size: 16px; margin-bottom: 5px; }
-    .result-details { display: flex; gap: 20px; font-size: 14px; opacity: 0.9; }
+    .apy { font-weight: 700; color: #0052FF; }
+    .payment { text-align: center; margin-top: 30px; }
+    .cost { font-size: 36px; color: #0052FF; font-weight: 700; margin: 10px 0; }
+    .address { font-family: monospace; word-break: break-all; margin: 10px 0; }
+    .copy-btn {
+      background: #0052FF; color: #fff; border: none;
+      padding: 12px 24px; border-radius: 8px; font-weight: 600;
+      cursor: pointer; margin-top: 8px;
+    }
+    .try-btn {
+      background: #0052FF; color: #fff; border: none;
+      padding: 16px 40px; font-size: 18px; border-radius: 12px;
+      cursor: pointer; font-weight: 700; margin-top: 25px; width: 100%;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="logo">🌊</div>
-      <h1>YieldAgent</h1>
-      <p class="subtitle">NEAR Liquid Staking Yields</p>
-      <span class="network-badge">🟢 NEAR Protocol</span>
+  <div class="card">
+    <div class="logo">🔵</div>
+    <h1>YieldAgent</h1>
+    <p class="subtitle">Live on Base</p>
+
+    <div class="payment">
+      <div class="cost">0.01 USDC</div>
+      <div class="address">${CONFIG.PAYMENT_ADDRESS}</div>
+      <button class="copy-btn">📋 Copy</button>
     </div>
-    <div class="card">
-      <h2>🔒 Unlock Liquid Staking Data</h2>
-      <div class="yields-preview">
-        <div class="yield-item">
-          <span class="protocol-name">RHEA</span>
-          <span class="apy">9.2%</span>
-        </div>
-        <div class="yield-item">
-          <span class="protocol-name">Meta Pool</span>
-          <span class="apy">8.7%</span>
-        </div>
-        <div class="yield-item">
-          <span class="protocol-name">Linear Protocol</span>
-          <span class="apy">8.5%</span>
-        </div>
-      </div>
-      <div class="payment-section">
-        <div class="payment-details">
-          <div class="label">One-time Access Fee</div>
-          <div class="cost">\${CONFIG.PAYMENT_AMOUNT} NEAR</div>
-          <div class="label">on NEAR Mainnet</div>
-          <div class="address-section">
-            <div class="label">Send NEAR to:</div>
-            <div class="address-container">
-              <div class="address" id="paymentAddress">\${CONFIG.PAYMENT_ADDRESS}</div>
-              <button class="copy-btn" onclick="copyAddress()">📋 Copy</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <button class="try-agent-btn" onclick="tryAgent()">🚀 Try Agent</button>
-      <div class="result-section" id="resultSection">
-        <h3>✅ Yield Opportunities Retrieved!</h3>
-        <div id="resultData"></div>
-      </div>
-      <div class="instructions">
-        <h3>How to Use:</h3>
-        <ol>
-          <li>Send <strong>\${CONFIG.PAYMENT_AMOUNT} NEAR</strong> to the address above on <strong>NEAR network</strong></li>
-          <li>Copy your transaction hash</li>
-          <li>Click "Try Agent" and paste your transaction hash</li>
-          <li>Access real-time liquid staking yields</li>
-        </ol>
-        <p style="margin-top: 15px;">
-          <strong>API Usage:</strong><br>
-          <code>GET /</code> with header<br>
-          <code>X-Payment: {"txHash": "your-tx-hash", "amount": \${CONFIG.PAYMENT_AMOUNT}}</code>
-        </p>
-      </div>
-    </div>
-    <div class="footer">Powered by x402 Protocol • NEAR Network</div>
-  </div>
-  <script>
-    function copyAddress() {
-      const address = document.getElementById('paymentAddress').textContent;
-      navigator.clipboard.writeText(address).then(() => {
-        const btn = event.target;
-        const originalText = btn.textContent;
-        btn.textContent = '✅ Copied!';
-        setTimeout(() => { btn.textContent = originalText; }, 2000);
-      });
-    }
-    async function tryAgent() {
-      const txHash = prompt('Enter your NEAR payment transaction hash:');
-      if (!txHash) return;
-      try {
-        const response = await fetch('/', {
-          method: 'GET',
-          headers: { 'X-Payment': JSON.stringify({ txHash: txHash, amount: \${CONFIG.PAYMENT_AMOUNT} }) }
+
+    <button class="try-btn" onclick="tryAgent()">🚀 Try Agent</button>
+
+    <script>
+      function copyAddress() {
+        navigator.clipboard.writeText('${CONFIG.PAYMENT_ADDRESS}');
+        this.textContent = '✅ Copied';
+        setTimeout(() => this.textContent = '📋 Copy', 2000);
+      }
+      document.querySelector('.copy-btn').onclick = copyAddress;
+
+      async function tryAgent() {
+        const hash = prompt('Enter your Base USDC tx hash:');
+        if (!hash) return;
+        const res = await fetch('/', {
+          headers: { 'X-Payment': JSON.stringify({ txHash: hash, amount: 0.01 }) }
         });
-        if (response.ok) {
-          const data = await response.json();
-          displayResults(data);
+        if (res.ok) {
+          const data = await res.json();
+          const out = data.data.opportunities.map(o => 
+            \`<div class="yield-item"><strong>\${o.protocol}</strong>: \${o.apy}</div>\`
+          ).join('');
+          document.body.innerHTML += \`<div style="margin-top:20px">\${out}</div>\`;
         } else {
-          const error = await response.json();
-          alert('Payment verification failed: ' + (error.message || error.error));
+          alert('Payment not verified.');
         }
-      } catch (error) {
-        alert('Error: ' + error.message);
       }
-    }
-    function displayResults(data) {
-      const resultSection = document.getElementById('resultSection');
-      const resultData = document.getElementById('resultData');
-      if (data.success && data.data && data.data.opportunities) {
-        let html = '';
-        data.data.opportunities.forEach(opp => {
-          html += '<div class="result-item"><div class="result-protocol">' + opp.protocol + 
-            '</div><div class="result-details"><span>APY: <strong>' + opp.apy + 
-            '</strong></span><span>TVL: <strong>' + opp.tvl + 
-            '</strong></span><span>Risk: <strong>' + opp.risk + '</strong></span></div></div>';
-        });
-        resultData.innerHTML = html;
-        resultSection.classList.add('show');
-        resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }
-  </script>
+    </script>
+  </div>
 </body>
-</html>`;
-}
+</html>
+`;
 
 export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
+  async fetch(req, env, ctx) {
+    const url = new URL(req.url);
     const path = url.pathname;
-    const corsHeaders = {
+
+    const cors = {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-Payment, X-Payment-Proof',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'X-Payment'
     };
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
+    if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+
+    if (path === '/x402-info') {
+      return new Response(JSON.stringify({
+        x402Version: 1,
+        accepts: [{
+          scheme: 'exact',
+          network: 'base',
+          maxAmountRequired: '0.01',
+          asset: 'USDC',
+          payTo: CONFIG.PAYMENT_ADDRESS,
+          resource: '/',
+          description: CONFIG.API_DESCRIPTION,
+          mimeType: 'application/json'
+        }]
+      }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    if (path === '/health') {
-      return new Response(JSON.stringify({ 
-        status: 'ok', 
-        x402Enabled: true,
-        network: 'near',
-        paymentAsset: 'NEAR'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (path === '/x402-info' || path === '/.well-known/x402') {
-      const x402Info = generateX402Response(path);
-      return new Response(JSON.stringify(x402Info), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (path === '/' || path === '/yield-opportunities') {
-      const paymentHeader = request.headers.get('X-Payment');
-      
-      if (!paymentHeader) {
-        return new Response(getHTMLPage(), {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'text/html',
-            'X-Payment-Required': 'true',
-            'X-Payment-Protocol': 'x402'
-          }
+    if (path === '/') {
+      const pay = req.headers.get('X-Payment');
+      if (!pay) {
+        return new Response(HTML_PAGE, {
+          headers: { ...cors, 'Content-Type': 'text/html' }
         });
       }
-
       try {
-        const payment = JSON.parse(paymentHeader);
-        if (!payment.txHash || !payment.amount) {
-          return new Response(JSON.stringify({ error: 'Invalid payment format' }), {
-            status: 402,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        const p = JSON.parse(pay);
+        if (p.txHash && p.amount == '0.01') {
+          return new Response(JSON.stringify(YIELD_DATA), {
+            headers: { ...cors, 'Content-Type': 'application/json' }
           });
         }
-
-        console.log(`Payment received: ${payment.txHash}`);
-        return new Response(JSON.stringify(YIELD_DATA), {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-            'X-Payment-Verified': 'true',
-            'X-Payment-Response': JSON.stringify({ txHash: payment.txHash, verified: true })
-          }
-        });
-      } catch (error) {
-        return new Response(JSON.stringify({
-          error: 'Payment processing failed',
-          message: error.message
-        }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        return new Response(JSON.stringify({ error: 'invalid' }), { status: 402 });
+      } catch {
+        return new Response(JSON.stringify({ error: 'bad header' }), { status: 400 });
       }
     }
 
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return new Response(JSON.stringify({ error: '404' }), { status: 404 });
   }
 };
