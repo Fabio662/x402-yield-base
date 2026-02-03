@@ -1,11 +1,11 @@
 /**
- * Base x402 Yield Agent - Pay 0.01 USDC to unlock current USDC yields on Base
+ * Base x402 Yield Agent - Pay 0.01 USDC to unlock live USDC yields on Base
  */
 
 const CONFIG = {
   PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1',
   PAYMENT_AMOUNT: '0.01',
-  RPC_URL: 'https://mainnet.base.org', // Use Alchemy/Infura in prod for reliability
+  RPC_URL: 'https://mainnet.base.org', // Use Alchemy/Infura for production reliability
   API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho, Moonwell, etc.'
 };
 
@@ -20,7 +20,7 @@ const YIELD_DATA = {
     ],
     network: "Base",
     lastUpdated: new Date().toISOString(),
-    disclaimer: "Yields fluctuate; always DYOR. Approximate Feb 2026 data."
+    disclaimer: "Yields fluctuate; always DYOR. Approximate early 2026 data."
   }
 };
 
@@ -51,18 +51,22 @@ const HTML_PAGE = `<!DOCTYPE html>
     <div class="logo">🔵</div>
     <h1>YieldAgent</h1>
     <p class="subtitle">Live USDC Yields on Base</p>
+
     <div class="yields">
       <div class="yield-item">Morpho (Steakhouse): <strong class="apy">~4.0–4.6%</strong></div>
       <div class="yield-item">Aave V3: <strong class="apy">~3.6–3.9%</strong></div>
       <div class="yield-item">Moonwell Flagship: <strong class="apy">~4.3–4.6%</strong></div>
       <div class="yield-item">Morpho Blue: <strong class="apy">~3.5–4.5%</strong></div>
     </div>
+
     <div class="payment">
       <div class="cost">0.01 USDC</div>
       <div class="address">${CONFIG.PAYMENT_ADDRESS}</div>
       <button class="copy-btn">📋 Copy</button>
     </div>
+
     <button class="try-btn" onclick="tryAgent()">🚀 Unlock Yields</button>
+
     <script>
       function copyAddress() {
         navigator.clipboard.writeText('${CONFIG.PAYMENT_ADDRESS}');
@@ -72,19 +76,23 @@ const HTML_PAGE = `<!DOCTYPE html>
       document.querySelector('.copy-btn').onclick = copyAddress;
 
       async function tryAgent() {
-        const hash = prompt('Enter Base tx hash:');
+        const hash = prompt('Enter your Base tx hash:');
         if (!hash) return;
+
         const res = await fetch('/', {
           headers: { 'X-Payment': JSON.stringify({ txHash: hash, amount: '0.01' }) }
         });
+
         if (res.ok) {
           const data = await res.json();
           const out = data.data.opportunities.map(o =>
-            `<div class="yield-item"><strong>${o.protocol}</strong>: ${o.apy} (TVL: ${o.tvl}) — ${o.note || ''}</div>`
+            '<div class="yield-item"><strong>' + o.protocol + '</strong>: ' +
+            o.apy + ' (TVL: ' + o.tvl + ') — ' + (o.note || '') + '</div>'
           ).join('');
-          document.body.innerHTML += `<div style="margin-top:20px; text-align:center;">${out}</div>`;
+
+          document.body.innerHTML += '<div style="margin-top:20px; text-align:center;">' + out + '</div>';
         } else {
-          alert('Payment not verified.');
+          alert('Payment not verified or invalid tx hash.');
         }
       }
     </script>
@@ -100,7 +108,7 @@ export default {
     const cors = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'X-Payment'
+      'Access-Control-Allow-Headers': 'X-Payment, Content-Type'
     };
 
     if (req.method === 'OPTIONS') {
@@ -124,31 +132,51 @@ export default {
     }
 
     if (path !== '/') {
-      return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: cors });
+      return new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: cors
+      });
     }
 
     const payHeader = req.headers.get('X-Payment');
 
     if (!payHeader) {
-      return new Response(HTML_PAGE, { headers: { ...cors, 'Content-Type': 'text/html' } });
+      return new Response(HTML_PAGE, {
+        headers: { ...cors, 'Content-Type': 'text/html' }
+      });
     }
 
     try {
       const payment = JSON.parse(payHeader);
 
       if (payment.amount !== CONFIG.PAYMENT_AMOUNT || typeof payment.txHash !== 'string') {
-        return new Response(JSON.stringify({ error: 'Invalid payment details' }), { status: 402, headers: cors });
+        return new Response(JSON.stringify({ error: 'Invalid payment details' }), {
+          status: 402,
+          headers: cors
+        });
       }
 
       const verified = await verifyTxHash(payment.txHash);
+
       if (!verified) {
-        return new Response(JSON.stringify({ error: 'Payment not confirmed on-chain' }), { status: 402, headers: cors });
+        return new Response(JSON.stringify({ error: 'Payment not confirmed on-chain' }), {
+          status: 402,
+          headers: cors
+        });
       }
 
-      return new Response(JSON.stringify(YIELD_DATA), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify(YIELD_DATA), {
+        headers: { ...cors, 'Content-Type': 'application/json' }
+      });
 
     } catch (e) {
-      return new Response(JSON.stringify({ error: 'Bad request', message: e.message }), { status: 400, headers: cors });
+      return new Response(JSON.stringify({
+        error: 'Bad request',
+        message: e.message
+      }), {
+        status: 400,
+        headers: cors
+      });
     }
   }
 };
