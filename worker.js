@@ -6,7 +6,9 @@ const CONFIG = {
   PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1',
   PAYMENT_AMOUNT: '0.01',
   RPC_URL: 'https://mainnet.base.org', // Upgrade to Alchemy/Infura in production
-  API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho, Moonwell, etc.'
+  API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho, Moonwell, etc.',
+  NETWORK: 'base',
+  PAYMENT_ASSET: 'USDC'
 };
 
 const YIELD_DATA = {
@@ -124,14 +126,36 @@ export default {
         x402Version: 1,
         accepts: [{
           scheme: 'exact',
-          network: 'base',
-          maxAmountRequired: '0.01',
-          asset: 'USDC',
+          network: CONFIG.NETWORK,
+          maxAmountRequired: CONFIG.PAYMENT_AMOUNT,
+          asset: CONFIG.PAYMENT_ASSET,
           payTo: CONFIG.PAYMENT_ADDRESS,
           resource: '/',
           description: CONFIG.API_DESCRIPTION,
           mimeType: 'application/json'
         }]
+      }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
+    if (path === '/.well-known/x402') {
+      return new Response(JSON.stringify({
+        x402Version: 1,
+        resources: [
+          {
+            path: '/',
+            description: CONFIG.API_DESCRIPTION,
+            accepts: [
+              {
+                scheme: 'exact',
+                network: CONFIG.NETWORK,
+                asset: CONFIG.PAYMENT_ASSET,
+                maxAmountRequired: CONFIG.PAYMENT_AMOUNT,
+                payTo: CONFIG.PAYMENT_ADDRESS,
+                mimeType: 'application/json'
+              }
+            ]
+          }
+        ]
       }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
