@@ -5,12 +5,11 @@
 const CONFIG = {
   PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1',
   PAYMENT_AMOUNT: '0.01',
-  PAYMENT_AMOUNT_ATOMIC: '10000000',          // 0.01 USDC = 10,000,000 units (6 decimals)
-  USDC_ADDRESS_BASE: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  NETWORK_CAIP2: 'eip155:8453',               // CAIP-2 for Base
   RPC_URL: 'https://mainnet.base.org',
   API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho, Moonwell, etc.',
-  MAX_TIMEOUT_SECONDS: 300                    // 5 minutes
+  NETWORK: 'base',
+  PAYMENT_ASSET: 'USDC',
+  MAX_TIMEOUT_SECONDS: 300
 };
 
 const YIELD_DATA = {
@@ -55,22 +54,18 @@ const HTML_PAGE = `<!DOCTYPE html>
     <div class="logo">🔵</div>
     <h1>YieldAgent</h1>
     <p class="subtitle">Live USDC Yields on Base</p>
-
     <div class="yields">
       <div class="yield-item">Morpho (Steakhouse): <strong class="apy">~4.0–4.6%</strong></div>
       <div class="yield-item">Aave V3: <strong class="apy">~3.6–3.9%</strong></div>
       <div class="yield-item">Moonwell Flagship: <strong class="apy">~4.3–4.6%</strong></div>
       <div class="yield-item">Morpho Blue: <strong class="apy">~3.5–4.5%</strong></div>
     </div>
-
     <div class="payment">
       <div class="cost">0.01 USDC</div>
       <div class="address">${CONFIG.PAYMENT_ADDRESS}</div>
       <button class="copy-btn">📋 Copy</button>
     </div>
-
     <button class="try-btn" onclick="tryAgent()">🚀 Unlock Yields</button>
-
     <script>
       function copyAddress() {
         navigator.clipboard.writeText('${CONFIG.PAYMENT_ADDRESS}');
@@ -82,17 +77,14 @@ const HTML_PAGE = `<!DOCTYPE html>
       async function tryAgent() {
         const hash = prompt('Enter your Base tx hash:');
         if (!hash) return;
-
         const res = await fetch('/', {
           headers: { 'X-Payment': JSON.stringify({ txHash: hash, amount: '0.01' }) }
         });
-
         if (res.ok) {
           const data = await res.json();
           let out = '';
           data.data.opportunities.forEach(function(o) {
-            out += '<div class="yield-item"><strong>' + o.protocol + '</strong>: ' +
-                   o.apy + ' (TVL: ' + o.tvl + ')';
+            out += '<div class="yield-item"><strong>' + o.protocol + '</strong>: ' + o.apy + ' (TVL: ' + o.tvl + ')';
             if (o.note) out += ' — ' + o.note;
             out += '</div>';
           });
@@ -121,42 +113,34 @@ export default {
       return new Response(null, { headers: cors });
     }
 
-    // Discovery document
     if (path === '/.well-known/x402') {
       return new Response(JSON.stringify({
         version: 1,
-        resources: [
-          url.origin + '/'
-        ],
-        instructions: "# YieldAgent\n\nPay **0.01 USDC** on **Base** to unlock current USDC yield data.\n\n1. Send exactly 0.01 USDC to the address shown\n2. Get the tx hash from your wallet\n3. Paste it in the prompt\n\nAlways verify on-chain data yourself."
+        resources: [url.origin + '/'],
+        instructions: "# YieldAgent\n\nPay 0.01 USDC on Base to unlock live USDC yield data."
       }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
     if (path !== '/') {
-      return new Response(JSON.stringify({ error: 'Not found' }), {
-        status: 404,
-        headers: cors
-      });
+      return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: cors });
     }
 
     const payHeader = req.headers.get('X-Payment');
 
-    // No payment header → return 402 with strict schema
     if (!payHeader) {
-      const resourceUrl = url.origin + '/';  // clean string only
-
       return new Response(JSON.stringify({
         error: 'Payment Required',
-        message: `Send exactly ${CONFIG.PAYMENT_AMOUNT} USDC on Base to access this resource.`,
+        message: `Send exactly ${CONFIG.PAYMENT_AMOUNT} ${CONFIG.PAYMENT_ASSET} on ${CONFIG.NETWORK} to access this resource.`,
         accepts: [{
           scheme: 'exact',
-          network: CONFIG.NETWORK_CAIP2,
-          amount: CONFIG.PAYMENT_AMOUNT_ATOMIC,
+          network: CONFIG.NETWORK,
+          maxAmountRequired: CONFIG.PAYMENT_AMOUNT,     // ← required by x402scan
+          asset: CONFIG.PAYMENT_ASSET,
           payTo: CONFIG.PAYMENT_ADDRESS,
-          asset: CONFIG.USDC_ADDRESS_BASE,
-          maxTimeoutSeconds: CONFIG.MAX_TIMEOUT_SECONDS,
+          description: CONFIG.API_DESCRIPTION,          // ← required by x402scan
           mimeType: 'application/json',
-          resource: resourceUrl  // ← string, not object → fixes [object Object]
+          maxTimeoutSeconds: CONFIG.MAX_TIMEOUT_SECONDS,
+          resource: url.origin + '/'
         }]
       }), {
         status: 402,
@@ -164,45 +148,28 @@ export default {
       });
     }
 
-    // Payment header present → verify
+    // ... rest of payment verification logic remains the same
     try {
       const payment = JSON.parse(payHeader);
 
       if (payment.amount !== CONFIG.PAYMENT_AMOUNT || typeof payment.txHash !== 'string') {
-        return new Response(JSON.stringify({ error: 'Invalid payment details' }), {
-          status: 402,
-          headers: cors
-        });
+        return new Response(JSON.stringify({ error: 'Invalid payment details' }), { status: 402, headers: cors });
       }
 
       const verified = await verifyTxHash(payment.txHash);
 
       if (!verified) {
-        return new Response(JSON.stringify({ error: 'Payment not confirmed on-chain' }), {
-          status: 402,
-          headers: cors
-        });
+        return new Response(JSON.stringify({ error: 'Payment not confirmed on-chain' }), { status: 402, headers: cors });
       }
 
-      // Verified → serve content
       if (req.headers.get('Accept')?.includes('text/html')) {
-        return new Response(HTML_PAGE, {
-          headers: { ...cors, 'Content-Type': 'text/html' }
-        });
+        return new Response(HTML_PAGE, { headers: { ...cors, 'Content-Type': 'text/html' } });
       }
 
-      return new Response(JSON.stringify(YIELD_DATA), {
-        headers: { ...cors, 'Content-Type': 'application/json' }
-      });
+      return new Response(JSON.stringify(YIELD_DATA), { headers: { ...cors, 'Content-Type': 'application/json' } });
 
     } catch (e) {
-      return new Response(JSON.stringify({
-        error: 'Bad request',
-        message: e.message
-      }), {
-        status: 400,
-        headers: cors
-      });
+      return new Response(JSON.stringify({ error: 'Bad request', message: e.message }), { status: 400, headers: cors });
     }
   }
 };
@@ -219,7 +186,6 @@ async function verifyTxHash(txHash) {
         id: 1
       })
     });
-
     const json = await response.json();
     return json.result && json.result.status === '0x1';
   } catch {
