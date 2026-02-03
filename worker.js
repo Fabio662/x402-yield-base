@@ -5,7 +5,7 @@
 const CONFIG = {
   PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1',
   PAYMENT_AMOUNT: '0.01',
-  RPC_URL: 'https://mainnet.base.org', // Use Alchemy/Infura for production reliability
+  RPC_URL: 'https://mainnet.base.org', // Upgrade to Alchemy/Infura in production
   API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho, Moonwell, etc.'
 };
 
@@ -85,10 +85,14 @@ const HTML_PAGE = `<!DOCTYPE html>
 
         if (res.ok) {
           const data = await res.json();
-          const out = data.data.opportunities.map(o =>
-            '<div class="yield-item"><strong>' + o.protocol + '</strong>: ' +
-            o.apy + ' (TVL: ' + o.tvl + ') — ' + (o.note || '') + '</div>'
-          ).join('');
+
+          let out = '';
+          data.data.opportunities.forEach(function(o) {
+            out += '<div class="yield-item"><strong>' + o.protocol + '</strong>: ' +
+                   o.apy + ' (TVL: ' + o.tvl + ')';
+            if (o.note) out += ' — ' + o.note;
+            out += '</div>';
+          });
 
           document.body.innerHTML += '<div style="margin-top:20px; text-align:center;">' + out + '</div>';
         } else {
