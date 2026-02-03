@@ -175,5 +175,4 @@ export default {
         });
       }
       try {
-        const p = JSON.parse(pay);
-        if (p.txHash && p.amount ==
+  
