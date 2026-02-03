@@ -20,25 +20,25 @@ const YIELD_DATA = {
       {
         id: 1,
         protocol: "Pendle",
-        apy: "≈10–15%",
+        apy: "≈9–17%+ (variable/specific pool/maturity)",
         risk: "Medium",
-        tvl: "$3B+ (approx)",
+        tvl: "Protocol-wide stablecoin pools",
         asset: "USDC"
       },
       {
         id: 2,
         protocol: "Aerodrome",
-        apy: "Varies (LP + incentives)",
+        apy: "≈8–15%+ (LP + incentives)",
         risk: "Medium",
-        tvl: "$450M+",
+        tvl: "$450M+ (stablecoin liquidity on Base)",
         asset: "USDC"
       },
       {
         id: 3,
         protocol: "Compound",
-        apy: "≈3.5–5%",
+        apy: "≈3.5–4.5% (supply yield)",
         risk: "Low",
-        tvl: "$150M+",
+        tvl: "Base lending USDC pool",
         asset: "USDC"
       }
     ],
@@ -131,7 +131,7 @@ const HTML_PAGE = `
         });
         if (res.ok) {
           const data = await res.json();
-          const out = data.data.opportunities.map(o => 
+          const out = data.data.opportunities.map(o =>
             \`<div class="yield-item"><strong>\${o.protocol}</strong>: \${o.apy}</div>\`
           ).join('');
           document.body.innerHTML += \`<div style="margin-top:20px">\${out}</div>\`;
