@@ -1,14 +1,14 @@
 /**
- * Base x402 Yield Agent - Pay 0.01 USDC to unlock live USDC yields on Base
- * x402scan compliant — v2 schema with outputSchema.input
+ * Base x402 Yield Agent — Pay 0.01 USDC to unlock live USDC yields on Base
+ * Fully compliant with x402 v2 and x402scan registration requirements (Feb 2026)
  */
 
 const CONFIG = {
   PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1',
-  PAYMENT_AMOUNT: '0.01',                          // human-readable (for HTML + messages)
-  PAYMENT_AMOUNT_ATOMIC: '10000',                  // 0.01 USDC = 10_000 atomic units (6 decimals) → 0.01 * 1e6
-  USDC_CONTRACT: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // Base mainnet USDC contract
-  NETWORK: 'eip155:8453',                          // Base mainnet in eip155 format — x402scan requires this
+  PAYMENT_AMOUNT: '0.01',                    // human-readable (messages/HTML)
+  PAYMENT_AMOUNT_ATOMIC: '10000',            // 0.01 USDC = 10_000 units (6 decimals)
+  USDC_CONTRACT: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // Base USDC
+  NETWORK_CAIP2: 'eip155:8453',              // x402scan requires CAIP-2
   API_DESCRIPTION: 'Live USDC yields on Base: Morpho, Aave, Moonwell, Seamless, ExtraFi',
   MAX_TIMEOUT_SECONDS: 300
 };
@@ -36,53 +36,19 @@ const HTML_PAGE = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>YieldAgent - Base</title>
   <style>
-    body {
-      background: #0a0e1a;
-      color: white;
-      font-family: -apple-system, sans-serif;
-      margin: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .card {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid #0052FF;
-      border-radius: 20px;
-      padding: 40px;
-      max-width: 700px;
-      width: 100%;
-    }
+    body { background: #0a0e1a; color: white; font-family: -apple-system, sans-serif; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+    .card { background: rgba(255,255,255,0.05); border: 1px solid #0052FF; border-radius: 20px; padding: 40px; max-width: 700px; width: 100%; }
     .logo { font-size: 80px; margin-bottom: 20px; color: #0052FF; }
     h1 { font-size: 48px; margin: 8px 0; }
     .subtitle { font-size: 20px; color: #0052FF88; }
-    .yield-item {
-      display: flex; justify-content: space-between;
-      padding: 15px;
-      margin: 6px 0;
-      background: rgba(0,82,255,0.08);
-      border-radius: 10px;
-      border: 1px solid #0052FFaa;
-    }
-    .apy { font-weight: 700; color: #0052FF; }
+    .yields { margin: 20px 0; text-align: center; font-size: 16px; color: #0052FFaa; }
+    .yield-item { margin: 8px 0; opacity: 0.9; }
+    .apy { color: #0052FF; font-weight: 600; }
     .payment { text-align: center; margin-top: 30px; }
     .cost { font-size: 36px; color: #0052FF; font-weight: 700; margin: 10px 0; }
     .address { font-family: monospace; word-break: break-all; margin: 10px 0; }
-    .copy-btn {
-      background: #0052FF; color: #fff; border: none;
-      padding: 12px 24px; border-radius: 8px; font-weight: 600;
-      cursor: pointer; margin-top: 8px;
-    }
-    .try-btn {
-      background: #0052FF; color: #fff; border: none;
-      padding: 16px 40px; font-size: 18px; border-radius: 12px;
-      cursor: pointer; font-weight: 700; margin-top: 25px; width: 100%;
-    }
-    .try-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .status { margin-top: 16px; font-size: 14px; color: #0052FF; text-align: center; min-height: 20px; }
-    .error { color: #ff4444; }
+    .copy-btn { background: #0052FF; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    .try-btn { background: #0052FF; color: #fff; border: none; padding: 16px 40px; font-size: 18px; border-radius: 12px; cursor: pointer; font-weight: 700; margin-top: 25px; width: 100%; }
   </style>
 </head>
 <body>
@@ -91,73 +57,62 @@ const HTML_PAGE = `<!DOCTYPE html>
     <h1>YieldAgent</h1>
     <p class="subtitle">Live USDC Yields on Base</p>
 
+    <div class="yields">
+      <div class="yield-item">Morpho (Steakhouse): <strong class="apy">~4.0–4.6%</strong></div>
+      <div class="yield-item">Aave V3: <strong class="apy">~3.6–3.9%</strong></div>
+      <div class="yield-item">Moonwell Flagship: <strong class="apy">~4.3–4.6%</strong></div>
+      <div class="yield-item">Morpho Blue: <strong class="apy">~3.5–4.5%</strong></div>
+      <div class="yield-item">ExtraFi: <strong class="apy">9.1%</strong></div>
+    </div>
+
     <div class="payment">
       <div class="cost">0.01 USDC</div>
       <div class="address">${CONFIG.PAYMENT_ADDRESS}</div>
-      <button class="copy-btn" id="copyBtn">📋 Copy</button>
+      <button class="copy-btn">📋 Copy</button>
     </div>
 
-    <button class="try-btn" id="tryBtn" onclick="tryAgent()">🚀 Unlock Yields</button>
-    <div class="status" id="status"></div>
-    <div id="yieldsOut"></div>
-  </div>
+    <button class="try-btn" onclick="tryAgent()">🚀 Unlock Yields</button>
 
-  <script>
-    document.getElementById('copyBtn').addEventListener('click', function() {
-      navigator.clipboard.writeText('${CONFIG.PAYMENT_ADDRESS}');
-      this.textContent = '✅ Copied';
-      setTimeout(() => { this.textContent = '📋 Copy'; }, 2000);
-    });
-
-    async function tryAgent() {
-      const btn    = document.getElementById('tryBtn');
-      const status = document.getElementById('status');
-      const out    = document.getElementById('yieldsOut');
-
-      out.innerHTML = '';
-      status.textContent = '';
-      btn.disabled = true;
-      btn.textContent = '⏳ Waiting...';
-
-      const hash = prompt('Enter your Base USDC tx hash:');
-      if (!hash) {
-        btn.disabled = false;
-        btn.textContent = '🚀 Unlock Yields';
-        return;
+    <script>
+      function copyAddress() {
+        navigator.clipboard.writeText('${CONFIG.PAYMENT_ADDRESS}');
+        this.textContent = '✅ Copied!';
+        setTimeout(() => this.textContent = '📋 Copy', 2000);
       }
+      document.querySelector('.copy-btn').onclick = copyAddress;
 
-      status.textContent = 'Verifying payment...';
+      async function tryAgent() {
+        const hash = prompt('Enter your Base tx hash:');
+        if (!hash) return;
 
-      try {
         const res = await fetch('/', {
           headers: { 'X-Payment': JSON.stringify({ txHash: hash, amount: '0.01' }) }
         });
 
         if (res.ok) {
           const data = await res.json();
-          out.innerHTML = data.data.opportunities.map(o =>
-            '<div class="yield-item"><strong>' + o.protocol + '</strong><span class="apy">' + o.apy + '</span></div>'
-          ).join('');
-          status.textContent = '✅ Payment verified — data live';
+          let out = '';
+          data.data.opportunities.forEach(function(o) {
+            out += '<div class="yield-item"><strong>' + o.protocol + '</strong>: ' +
+                   o.apy + ' (TVL: ' + o.tvl + ')';
+            if (o.note) out += ' — ' + o.note;
+            out += '</div>';
+          });
+          document.body.innerHTML += '<div style="margin-top:20px; text-align:center;">' + out + '</div>';
         } else {
-          status.innerHTML = '<span class="error">❌ Payment not verified. Try again.</span>';
+          alert('Payment not verified or invalid tx hash.');
         }
-      } catch (e) {
-        status.innerHTML = '<span class="error">❌ Network error: ' + e.message + '</span>';
       }
-
-      btn.disabled = false;
-      btn.textContent = '🚀 Unlock Yields';
-    }
-  </script>
+    </script>
+  </div>
 </body>
 </html>`;
 
 export default {
   async fetch(req) {
-    const url  = new URL(req.url);
+    const url = new URL(req.url);
     const path = url.pathname;
-    const origin = url.origin;  // e.g. https://x402-yield-base.cryptoblac.workers.dev
+    const origin = url.origin;
 
     const cors = {
       'Access-Control-Allow-Origin': '*',
@@ -169,106 +124,103 @@ export default {
       return new Response(null, { headers: cors });
     }
 
-    // ── Health ──────────────────────────────────────────────
-    if (path === '/health') {
-      return new Response(JSON.stringify({
-        status: 'ok',
-        x402Enabled: true,
-        network: 'base',
-        asset: 'USDC'
-      }), { headers: { ...cors, 'Content-Type': 'application/json' } });
-    }
-
-    // ── x402 discovery (both paths — x402scan hits either) ─
+    // Discovery document (same schema as 402 response)
     if (path === '/x402-info' || path === '/.well-known/x402') {
       return new Response(JSON.stringify({
-        x402Version: 2,                                    // ✅ FIX 1: was 1, must be 2
+        x402Version: 2,
         accepts: [{
           scheme: 'exact',
-          network: CONFIG.NETWORK,                         // ✅ FIX 2: "eip155:8453" not "base"
-          maxAmountRequired: CONFIG.PAYMENT_AMOUNT_ATOMIC, // ✅ FIX 3: atomic units "10000" not "0.01"
+          network: CONFIG.NETWORK_CAIP2,
+          maxAmountRequired: CONFIG.PAYMENT_AMOUNT_ATOMIC,
           maxTimeoutSeconds: CONFIG.MAX_TIMEOUT_SECONDS,
-          asset: CONFIG.USDC_CONTRACT,                     // ✅ FIX 4: contract address not "USDC"
+          asset: CONFIG.USDC_CONTRACT,
           payTo: CONFIG.PAYMENT_ADDRESS,
-          resource: origin + '/',                          // ✅ FIX 5: full URL not "/"
+          resource: origin + '/',
           description: CONFIG.API_DESCRIPTION,
           mimeType: 'application/json',
-          extra: { name: 'USD Coin', version: '2' },      // helpful for x402scan display
-          outputSchema: {                                  // ✅ FIX 6: THIS is what "Missing input schema" needs
-            input: {
-              method: 'GET',
-              type: 'http'
-            },
+          extra: { name: 'USD Coin', version: '2' },
+          outputSchema: {
+            input: { method: 'GET', type: 'http' },
             output: null
           }
         }]
       }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    // ── Root ────────────────────────────────────────────────
-    if (path === '/') {
-      const payHeader = req.headers.get('X-Payment');
-
-      // No payment header → return 402 with the same x402-compliant schema
-      if (!payHeader) {
-        return new Response(JSON.stringify({
-          x402Version: 2,
-          accepts: [{
-            scheme: 'exact',
-            network: CONFIG.NETWORK,
-            maxAmountRequired: CONFIG.PAYMENT_AMOUNT_ATOMIC,
-            maxTimeoutSeconds: CONFIG.MAX_TIMEOUT_SECONDS,
-            asset: CONFIG.USDC_CONTRACT,
-            payTo: CONFIG.PAYMENT_ADDRESS,
-            resource: origin + '/',
-            description: CONFIG.API_DESCRIPTION,
-            mimeType: 'application/json',
-            extra: { name: 'USD Coin', version: '2' },
-            outputSchema: {
-              input: { method: 'GET', type: 'http' },
-              output: null
-            }
-          }]
-        }), {
-          status: 402,
-          headers: { ...cors, 'Content-Type': 'application/json' }
-        });
-      }
-
-      // Has payment → validate and serve
-      try {
-        const payment = JSON.parse(payHeader);
-
-        if (typeof payment.txHash !== 'string' || String(payment.amount) !== CONFIG.PAYMENT_AMOUNT) {
-          return new Response(JSON.stringify({ error: 'Invalid payment details' }), {
-            status: 402,
-            headers: { ...cors, 'Content-Type': 'application/json' }
-          });
-        }
-
-        // Accept-header check: HTML if browser, JSON if agent/API
-        if (req.headers.get('Accept')?.includes('text/html')) {
-          return new Response(HTML_PAGE, {
-            headers: { ...cors, 'Content-Type': 'text/html', 'X-Payment-Verified': 'true' }
-          });
-        }
-
-        return new Response(JSON.stringify(YIELD_DATA), {
-          headers: { ...cors, 'Content-Type': 'application/json', 'X-Payment-Verified': 'true' }
-        });
-
-      } catch (e) {
-        return new Response(JSON.stringify({ error: 'Bad request', message: e.message }), {
-          status: 400,
-          headers: { ...cors, 'Content-Type': 'application/json' }
-        });
-      }
+    if (path !== '/') {
+      return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: cors });
     }
 
-    // ── 404 ─────────────────────────────────────────────────
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: { ...cors, 'Content-Type': 'application/json' }
-    });
+    const payHeader = req.headers.get('X-Payment');
+
+    // Unpaid request → return 402 with full compliant schema
+    if (!payHeader) {
+      return new Response(JSON.stringify({
+        x402Version: 2,
+        accepts: [{
+          scheme: 'exact',
+          network: CONFIG.NETWORK_CAIP2,
+          maxAmountRequired: CONFIG.PAYMENT_AMOUNT_ATOMIC,
+          maxTimeoutSeconds: CONFIG.MAX_TIMEOUT_SECONDS,
+          asset: CONFIG.USDC_CONTRACT,
+          payTo: CONFIG.PAYMENT_ADDRESS,
+          resource: origin + '/',
+          description: CONFIG.API_DESCRIPTION,
+          mimeType: 'application/json',
+          extra: { name: 'USD Coin', version: '2' },
+          outputSchema: {
+            input: { method: 'GET', type: 'http' },
+            output: null
+          }
+        }]
+      }), {
+        status: 402,
+        headers: { ...cors, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Paid request → verify
+    try {
+      const payment = JSON.parse(payHeader);
+
+      if (String(payment.amount) !== CONFIG.PAYMENT_AMOUNT || typeof payment.txHash !== 'string') {
+        return new Response(JSON.stringify({ error: 'Invalid payment details' }), { status: 402, headers: cors });
+      }
+
+      const verified = await verifyTxHash(payment.txHash);
+
+      if (!verified) {
+        return new Response(JSON.stringify({ error: 'Payment not confirmed on-chain' }), { status: 402, headers: cors });
+      }
+
+      // Verified → serve content
+      if (req.headers.get('Accept')?.includes('text/html')) {
+        return new Response(HTML_PAGE, { headers: { ...cors, 'Content-Type': 'text/html' } });
+      }
+
+      return new Response(JSON.stringify(YIELD_DATA), { headers: { ...cors, 'Content-Type': 'application/json' } });
+
+    } catch (e) {
+      return new Response(JSON.stringify({ error: 'Bad request', message: e.message }), { status: 400, headers: cors });
+    }
   }
 };
+
+async function verifyTxHash(txHash) {
+  try {
+    const response = await fetch('https://mainnet.base.org', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+        id: 1
+      })
+    });
+    const json = await response.json();
+    return json.result && json.result.status === '0x1';
+  } catch {
+    return false;
+  }
+}
