@@ -4,13 +4,13 @@
 
 const CONFIG = {
   PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1',
-  PAYMENT_AMOUNT: '0.01',               // human readable
-  PAYMENT_AMOUNT_ATOMIC: '10000000',    // 0.01 USDC = 10_000_000 units (6 decimals)
+  PAYMENT_AMOUNT: '0.01',
+  PAYMENT_AMOUNT_ATOMIC: '10000000',          // 0.01 USDC = 10,000,000 units (6 decimals)
   USDC_ADDRESS_BASE: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  NETWORK_CAIP2: 'eip155:8453',         // CAIP-2 for Base mainnet
+  NETWORK_CAIP2: 'eip155:8453',               // CAIP-2 for Base
   RPC_URL: 'https://mainnet.base.org',
   API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho, Moonwell, etc.',
-  MAX_TIMEOUT_SECONDS: 300              // 5 minutes
+  MAX_TIMEOUT_SECONDS: 300                    // 5 minutes
 };
 
 const YIELD_DATA = {
@@ -121,17 +121,14 @@ export default {
       return new Response(null, { headers: cors });
     }
 
-    // Discovery document (v2-ish compatible)
+    // Discovery document
     if (path === '/.well-known/x402') {
       return new Response(JSON.stringify({
         version: 1,
         resources: [
-          {
-            url: url.origin + '/',
-            description: CONFIG.API_DESCRIPTION
-          }
+          url.origin + '/'
         ],
-        instructions: "# YieldAgent\n\nPay **0.01 USDC** on **Base** (eip155:8453) to unlock current USDC yield opportunities.\n\n1. Send exactly 0.01 USDC to the address shown\n2. Get the transaction hash\n3. Paste it in the prompt\n\nUSDC contract: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913\nAlways DYOR."
+        instructions: "# YieldAgent\n\nPay **0.01 USDC** on **Base** to unlock current USDC yield data.\n\n1. Send exactly 0.01 USDC to the address shown\n2. Get the tx hash from your wallet\n3. Paste it in the prompt\n\nAlways verify on-chain data yourself."
       }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
@@ -144,23 +141,22 @@ export default {
 
     const payHeader = req.headers.get('X-Payment');
 
-    // No payment → 402 with strict schema
+    // No payment header → return 402 with strict schema
     if (!payHeader) {
+      const resourceUrl = url.origin + '/';  // clean string only
+
       return new Response(JSON.stringify({
         error: 'Payment Required',
-        message: `Send exactly ${CONFIG.PAYMENT_AMOUNT} USDC on Base to access yields.`,
+        message: `Send exactly ${CONFIG.PAYMENT_AMOUNT} USDC on Base to access this resource.`,
         accepts: [{
           scheme: 'exact',
-          network: CONFIG.NETWORK_CAIP2,               // "eip155:8453"
-          amount: CONFIG.PAYMENT_AMOUNT_ATOMIC,        // "10000000"
+          network: CONFIG.NETWORK_CAIP2,
+          amount: CONFIG.PAYMENT_AMOUNT_ATOMIC,
           payTo: CONFIG.PAYMENT_ADDRESS,
           asset: CONFIG.USDC_ADDRESS_BASE,
           maxTimeoutSeconds: CONFIG.MAX_TIMEOUT_SECONDS,
           mimeType: 'application/json',
-          resource: {
-            url: url.origin + '/',
-            description: CONFIG.API_DESCRIPTION
-          }
+          resource: resourceUrl  // ← string, not object → fixes [object Object]
         }]
       }), {
         status: 402,
@@ -168,7 +164,7 @@ export default {
       });
     }
 
-    // Payment present → verify
+    // Payment header present → verify
     try {
       const payment = JSON.parse(payHeader);
 
