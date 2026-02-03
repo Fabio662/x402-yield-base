@@ -87,7 +87,6 @@ const HTML_PAGE = `<!DOCTYPE html>
 
         if (res.ok) {
           const data = await res.json();
-
           let out = '';
           data.data.opportunities.forEach(function(o) {
             out += '<div class="yield-item"><strong>' + o.protocol + '</strong>: ' +
@@ -95,7 +94,6 @@ const HTML_PAGE = `<!DOCTYPE html>
             if (o.note) out += ' — ' + o.note;
             out += '</div>';
           });
-
           document.body.innerHTML += '<div style="margin-top:20px; text-align:center;">' + out + '</div>';
         } else {
           alert('Payment not verified or invalid tx hash.');
@@ -121,6 +119,7 @@ export default {
       return new Response(null, { headers: cors });
     }
 
+    // Legacy / per-resource info endpoint (still useful)
     if (path === '/x402-info') {
       return new Response(JSON.stringify({
         x402Version: 1,
@@ -137,25 +136,34 @@ export default {
       }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
+    // x402 Discovery Document (recommended well-known path)
     if (path === '/.well-known/x402') {
       return new Response(JSON.stringify({
-        x402Version: 1,
+        version: 1,
         resources: [
-          {
-            path: '/',
-            description: CONFIG.API_DESCRIPTION,
-            accepts: [
-              {
-                scheme: 'exact',
-                network: CONFIG.NETWORK,
-                asset: CONFIG.PAYMENT_ASSET,
-                maxAmountRequired: CONFIG.PAYMENT_AMOUNT,
-                payTo: CONFIG.PAYMENT_ADDRESS,
-                mimeType: 'application/json'
-              }
-            ]
-          }
-        ]
+          "https://" + url.host + "/"
+        ],
+        ownershipProofs: [], // add signatures here when you implement ownership proof
+        instructions: [
+          "# YieldAgent API",
+          "",
+          "Pay **0.01 USDC** on **Base** to unlock current USDC yield opportunities.",
+          "",
+          "## How to use",
+          "1. Send exactly 0.01 USDC to the displayed address",
+          "2. Get the transaction hash",
+          "3. Use the \"Unlock Yields\" button and paste the tx hash",
+          "",
+          "## Payment address",
+          CONFIG.PAYMENT_ADDRESS,
+          "",
+          "## Important",
+          "- Only payments of **exactly 0.01 USDC** are accepted",
+          "- Transaction must be on **Base** network",
+          "- Yields are informational only – always DYOR",
+          "",
+          "Questions? Reach out via X or Discord (community channels)."
+        ].join('\n')
       }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
