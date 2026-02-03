@@ -4,11 +4,11 @@
 
 const CONFIG = {
   PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1',
-  PAYMENT_AMOUNT: '0.01',                    // human-readable
-  PAYMENT_AMOUNT_ATOMIC: '10000000',         // 0.01 USDC = 10,000,000 units (6 decimals)
-  USDC_ADDRESS_BASE: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  NETWORK: 'base',
+  PAYMENT_AMOUNT: '0.01',                    // human-readable (for messages)
+  PAYMENT_AMOUNT_ATOMIC: '10000000',         // 0.01 USDC = 10_000_000 units (6 decimals) → THIS fixes the invalid input
   API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho, Moonwell, etc.',
+  NETWORK: 'base',
+  PAYMENT_ASSET: 'USDC',
   MAX_TIMEOUT_SECONDS: 300
 };
 
@@ -120,6 +120,7 @@ export default {
       return new Response(null, { headers: cors });
     }
 
+    // Discovery document
     if (path === '/.well-known/x402') {
       return new Response(JSON.stringify({
         version: 1,
@@ -137,14 +138,14 @@ export default {
     if (!payHeader) {
       return new Response(JSON.stringify({
         error: 'Payment Required',
-        message: `Send exactly ${CONFIG.PAYMENT_AMOUNT} USDC on Base to access this resource.`,
+        message: `Send exactly ${CONFIG.PAYMENT_AMOUNT} ${CONFIG.PAYMENT_ASSET} on ${CONFIG.NETWORK} to access this resource.`,
         accepts: [{
           scheme: 'exact',
           network: CONFIG.NETWORK,
-          maxAmountRequired: CONFIG.PAYMENT_AMOUNT_ATOMIC,  // ← fixed: atomic units
+          maxAmountRequired: CONFIG.PAYMENT_AMOUNT_ATOMIC,  // ← atomic units: "10000000" fixes "Invalid input"
           asset: CONFIG.PAYMENT_ASSET,
           payTo: CONFIG.PAYMENT_ADDRESS,
-          description: CONFIG.API_DESCRIPTION,              // ← required
+          description: CONFIG.API_DESCRIPTION,              // required
           mimeType: 'application/json',
           maxTimeoutSeconds: CONFIG.MAX_TIMEOUT_SECONDS,
           resource: url.origin + '/'
