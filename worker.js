@@ -9,7 +9,7 @@ const CONFIG = {
   PAYMENT_ASSET: 'USDC',
   NETWORK: 'base',
   TIMEOUT_SECONDS: 3600,
-  API_DESCRIPTION: 'Live yields: Pendle, Aerodrome, Compound',
+  API_DESCRIPTION: 'Live yields: Pendle, Aerodrome, Compound, Aave, Morpho, Moonwell',
   API_VERSION: 1
 };
 
@@ -17,9 +17,12 @@ const YIELD_DATA = {
   success: true,
   data: {
     opportunities: [
-      { id: 1, protocol: "Pendle", apy: "11.3%", risk: "Low", tvl: "$210M", asset: "USDC" },
-      { id: 2, protocol: "Aerodrome", apy: "8.4%", risk: "Low", tvl: "$85M", asset: "USDC" },
-      { id: 3, protocol: "Compound", apy: "6.9%", risk: "Low", tvl: "$180M", asset: "USDC" }
+      { id: 1, protocol: "Pendle",         apy: "11.3%",  risk: "Low",    tvl: "$210M", asset: "USDC" },
+      { id: 2, protocol: "Aerodrome",      apy: "8.4%",   risk: "Low",    tvl: "$85M",  asset: "USDC" },
+      { id: 3, protocol: "Compound",       apy: "6.9%",   risk: "Low",    tvl: "$180M", asset: "USDC" },
+      { id: 4, protocol: "Aave",           apy: "7.5%",   risk: "Low",    tvl: "$120M", asset: "USDC" },
+      { id: 5, protocol: "Morpho",         apy: "8.02%",  risk: "Low",    tvl: "$45M",  asset: "USDC" },
+      { id: 6, protocol: "Moonwell",       apy: "6.8%",   risk: "Low",    tvl: "$85M",  asset: "USDC" }
     ],
     network: "Base",
     lastUpdated: new Date().toISOString()
@@ -92,6 +95,9 @@ const HTML_PAGE = `
       <div class="yield-item">Pendle: <strong class="apy">11.3%</strong></div>
       <div class="yield-item">Aerodrome: <strong class="apy">8.4%</strong></div>
       <div class="yield-item">Compound: <strong class="apy">6.9%</strong></div>
+      <div class="yield-item">Aave: <strong class="apy">7.5%</strong></div>
+      <div class="yield-item">Morpho: <strong class="apy">8.02%</strong></div>
+      <div class="yield-item">Moonwell: <strong class="apy">6.8%</strong></div>
     </div>
 
     <div class="payment">
@@ -170,17 +176,4 @@ export default {
       }
       try {
         const p = JSON.parse(pay);
-        if (p.txHash && p.amount == '0.01') {
-          return new Response(JSON.stringify(YIELD_DATA), {
-            headers: { ...cors, 'Content-Type': 'application/json' }
-          });
-        }
-        return new Response(JSON.stringify({ error: 'invalid' }), { status: 402 });
-      } catch {
-        return new Response(JSON.stringify({ error: 'bad header' }), { status: 400 });
-      }
-    }
-
-    return new Response(JSON.stringify({ error: '404' }), { status: 404 });
-  }
-};
+        if (p.txHash && p.amount ==
