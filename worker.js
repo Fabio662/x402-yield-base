@@ -1,34 +1,29 @@
 /**
- * Base x402 Yield Agent - Pay 0.01 USDC to unlock USDC yields on Base
- * Improved: basic tx verification, realistic Feb 2026 yields
+ * Base x402 Yield Agent - Pay 0.01 USDC to unlock current USDC yields on Base
  */
 
 const CONFIG = {
   PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1',
   PAYMENT_AMOUNT: '0.01',
-  PAYMENT_ASSET: 'USDC',
-  NETWORK: 'base',
-  TIMEOUT_SECONDS: 3600,
-  API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho, Moonwell, etc.',
-  RPC_URL: 'https://mainnet.base.org', // Replace with Alchemy/Infura for reliability in prod
+  RPC_URL: 'https://mainnet.base.org', // Use Alchemy/Infura in prod for reliability
+  API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho, Moonwell, etc.'
 };
 
 const YIELD_DATA = {
   success: true,
   data: {
     opportunities: [
-      { id: 1, protocol: "Morpho (Steakhouse USDC)", apy: "4.0–4.6%", risk: "Low-Medium", tvl: "~$400M+", asset: "USDC", note: "Curated vault with incentives" },
-      { id: 2, protocol: "Aave V3", apy: "3.6–3.9%", risk: "Low", tvl: "~$350M", asset: "USDC", note: "Variable supply APY" },
-      { id: 3, protocol: "Moonwell Flagship (Morpho)", apy: "4.3–4.6%", risk: "Low-Medium", tvl: "~$30–40M", asset: "USDC", note: "With WELL + MORPHO rewards" },
-      { id: 4, protocol: "Morpho Blue (various)", apy: "3.5–4.5%", risk: "Low", tvl: "Varies", asset: "USDC", note: "Optimized P2P lending" },
+      { id: 1, protocol: "Morpho (Steakhouse USDC)", apy: "4.0–4.6%", risk: "Low-Medium", tvl: "~$400M+", note: "Curated vault with incentives" },
+      { id: 2, protocol: "Aave V3", apy: "3.6–3.9%", risk: "Low", tvl: "~$350M", note: "Variable supply APY" },
+      { id: 3, protocol: "Moonwell Flagship (Morpho)", apy: "4.3–4.6%", risk: "Low-Medium", tvl: "~$30–40M", note: "With WELL + MORPHO rewards" },
+      { id: 4, protocol: "Morpho Blue (various)", apy: "3.5–4.5%", risk: "Low", tvl: "Varies", note: "Optimized P2P lending" }
     ],
     network: "Base",
     lastUpdated: new Date().toISOString(),
-    disclaimer: "Yields fluctuate; always DYOR."
+    disclaimer: "Yields fluctuate; always DYOR. Approximate Feb 2026 data."
   }
 };
 
-// HTML paywall page (unchanged except minor JS fix)
 const HTML_PAGE = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,22 +51,18 @@ const HTML_PAGE = `<!DOCTYPE html>
     <div class="logo">🔵</div>
     <h1>YieldAgent</h1>
     <p class="subtitle">Live USDC Yields on Base</p>
-
     <div class="yields">
       <div class="yield-item">Morpho (Steakhouse): <strong class="apy">~4.0–4.6%</strong></div>
       <div class="yield-item">Aave V3: <strong class="apy">~3.6–3.9%</strong></div>
       <div class="yield-item">Moonwell Flagship: <strong class="apy">~4.3–4.6%</strong></div>
       <div class="yield-item">Morpho Blue: <strong class="apy">~3.5–4.5%</strong></div>
     </div>
-
     <div class="payment">
       <div class="cost">0.01 USDC</div>
       <div class="address">${CONFIG.PAYMENT_ADDRESS}</div>
       <button class="copy-btn">📋 Copy</button>
     </div>
-
     <button class="try-btn" onclick="tryAgent()">🚀 Unlock Yields</button>
-
     <script>
       function copyAddress() {
         navigator.clipboard.writeText('${CONFIG.PAYMENT_ADDRESS}');
@@ -81,19 +72,19 @@ const HTML_PAGE = `<!DOCTYPE html>
       document.querySelector('.copy-btn').onclick = copyAddress;
 
       async function tryAgent() {
-        const hash = prompt('Enter your Base tx hash:');
+        const hash = prompt('Enter Base tx hash:');
         if (!hash) return;
-        const res = await fetch('/', { 
-          headers: { 'X-Payment': JSON.stringify({ txHash: hash, amount: '0.01' }) } 
+        const res = await fetch('/', {
+          headers: { 'X-Payment': JSON.stringify({ txHash: hash, amount: '0.01' }) }
         });
         if (res.ok) {
           const data = await res.json();
-          const out = data.data.opportunities.map(o => 
-            \`<div class="yield-item"><strong>\${o.protocol}</strong>: \${o.apy} (TVL: \${o.tvl}) — \${o.note || ''}</div>\`
+          const out = data.data.opportunities.map(o =>
+            `<div class="yield-item"><strong>${o.protocol}</strong>: ${o.apy} (TVL: ${o.tvl}) — ${o.note || ''}</div>`
           ).join('');
-          document.body.innerHTML += \`<div style="margin-top:20px; text-align:center;">\${out}</div>\`;
+          document.body.innerHTML += `<div style="margin-top:20px; text-align:center;">${out}</div>`;
         } else {
-          alert('Payment verification failed.');
+          alert('Payment not verified.');
         }
       }
     </script>
@@ -112,7 +103,9 @@ export default {
       'Access-Control-Allow-Headers': 'X-Payment'
     };
 
-    if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { headers: cors });
+    }
 
     if (path === '/x402-info') {
       return new Response(JSON.stringify({
@@ -142,19 +135,20 @@ export default {
 
     try {
       const payment = JSON.parse(payHeader);
-      if (payment.amount !== CONFIG.PAYMENT_AMOUNT || !payment.txHash) {
-        return new Response(JSON.stringify({ error: 'Invalid payment' }), { status: 402, headers: cors });
+
+      if (payment.amount !== CONFIG.PAYMENT_AMOUNT || typeof payment.txHash !== 'string') {
+        return new Response(JSON.stringify({ error: 'Invalid payment details' }), { status: 402, headers: cors });
       }
 
       const verified = await verifyTxHash(payment.txHash);
       if (!verified) {
-        return new Response(JSON.stringify({ error: 'Payment not confirmed' }), { status: 402, headers: cors });
+        return new Response(JSON.stringify({ error: 'Payment not confirmed on-chain' }), { status: 402, headers: cors });
       }
 
       return new Response(JSON.stringify(YIELD_DATA), { headers: { ...cors, 'Content-Type': 'application/json' } });
 
     } catch (e) {
-      return new Response(JSON.stringify({ error: 'Bad request', details: e.message }), { status: 400, headers: cors });
+      return new Response(JSON.stringify({ error: 'Bad request', message: e.message }), { status: 400, headers: cors });
     }
   }
 };
@@ -173,11 +167,7 @@ async function verifyTxHash(txHash) {
     });
 
     const json = await response.json();
-    if (json.result && json.result.status === '0x1') {
-      // Basic success check; improve with full Transfer log parsing in prod
-      return true;
-    }
-    return false;
+    return json.result && json.result.status === '0x1';
   } catch {
     return false;
   }
