@@ -9,7 +9,7 @@ const CONFIG = {
   PAYMENT_ASSET: 'USDC',
   NETWORK: 'base',
   TIMEOUT_SECONDS: 3600,
-  API_DESCRIPTION: 'Live yields: Morpho, Aave, Moonwell, Seamless, ExtraFi',
+  API_DESCRIPTION: 'Live yields: Pendle, Aerodrome, Compound',
   API_VERSION: 1
 };
 
@@ -17,11 +17,30 @@ const YIELD_DATA = {
   success: true,
   data: {
     opportunities: [
-      { id: 1, protocol: "Morpho", apy: "8.02%", risk: "Low", tvl: "$45M", asset: "USDC" },
-      { id: 2, protocol: "Aave", apy: "7.5%", risk: "Low", tvl: "$120M", asset: "USDC" },
-      { id: 3, protocol: "Moonwell", apy: "6.8%", risk: "Low", tvl: "$85M", asset: "USDC" },
-      { id: 4, protocol: "Seamless Protocol", apy: "7.2%", risk: "Medium", tvl: "$55M", asset: "USDC" },
-      { id: 5, protocol: "ExtraFi", apy: "9.1%", risk: "Medium", tvl: "$12M", asset: "USDC" }
+      {
+        id: 1,
+        protocol: "Pendle",
+        apy: "≈10–15%",
+        risk: "Medium",
+        tvl: "$3B+ (approx)",
+        asset: "USDC"
+      },
+      {
+        id: 2,
+        protocol: "Aerodrome",
+        apy: "Varies (LP + incentives)",
+        risk: "Medium",
+        tvl: "$450M+",
+        asset: "USDC"
+      },
+      {
+        id: 3,
+        protocol: "Compound",
+        apy: "≈3.5–5%",
+        risk: "Low",
+        tvl: "$150M+",
+        asset: "USDC"
+      }
     ],
     network: "Base",
     lastUpdated: new Date().toISOString()
