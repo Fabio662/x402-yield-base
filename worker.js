@@ -4,11 +4,13 @@
 
 const CONFIG = {
   PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1',
-  PAYMENT_AMOUNT: '0.01',
-  RPC_URL: 'https://mainnet.base.org', // Upgrade to Alchemy/Infura in production
+  PAYMENT_AMOUNT: '0.01',               // human readable
+  PAYMENT_AMOUNT_ATOMIC: '10000000',    // 0.01 USDC = 10_000_000 units (6 decimals)
+  USDC_ADDRESS_BASE: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  NETWORK_CAIP2: 'eip155:8453',         // CAIP-2 for Base mainnet
+  RPC_URL: 'https://mainnet.base.org',
   API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho, Moonwell, etc.',
-  NETWORK: 'base',
-  PAYMENT_ASSET: 'USDC'
+  MAX_TIMEOUT_SECONDS: 300              // 5 minutes
 };
 
 const YIELD_DATA = {
@@ -119,31 +121,17 @@ export default {
       return new Response(null, { headers: cors });
     }
 
-    // Legacy per-resource info (optional but useful)
-    if (path === '/x402-info') {
-      return new Response(JSON.stringify({
-        x402Version: 1,
-        accepts: [{
-          scheme: 'exact',
-          network: CONFIG.NETWORK,
-          maxAmountRequired: CONFIG.PAYMENT_AMOUNT,
-          asset: CONFIG.PAYMENT_ASSET,
-          payTo: CONFIG.PAYMENT_ADDRESS,
-          resource: '/',
-          description: CONFIG.API_DESCRIPTION,
-          mimeType: 'application/json'
-        }]
-      }), { headers: { ...cors, 'Content-Type': 'application/json' } });
-    }
-
-    // Discovery document
+    // Discovery document (v2-ish compatible)
     if (path === '/.well-known/x402') {
       return new Response(JSON.stringify({
         version: 1,
         resources: [
-          url.origin + '/'
+          {
+            url: url.origin + '/',
+            description: CONFIG.API_DESCRIPTION
+          }
         ],
-        instructions: "# YieldAgent\n\nPay **0.01 USDC** on **Base** to unlock current USDC yield opportunities.\n\n1. Send exactly 0.01 USDC to the address shown\n2. Get the transaction hash from your wallet\n3. Paste it in the prompt on the page\n\nAlways verify on-chain data yourself. Yields are approximate and change frequently."
+        instructions: "# YieldAgent\n\nPay **0.01 USDC** on **Base** (eip155:8453) to unlock current USDC yield opportunities.\n\n1. Send exactly 0.01 USDC to the address shown\n2. Get the transaction hash\n3. Paste it in the prompt\n\nUSDC contract: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913\nAlways DYOR."
       }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
@@ -156,18 +144,23 @@ export default {
 
     const payHeader = req.headers.get('X-Payment');
 
-    // No valid payment header → return 402 Payment Required with details
+    // No payment → 402 with strict schema
     if (!payHeader) {
       return new Response(JSON.stringify({
         error: 'Payment Required',
-        message: `Send exactly ${CONFIG.PAYMENT_AMOUNT} ${CONFIG.PAYMENT_ASSET} on ${CONFIG.NETWORK} to access this resource.`,
+        message: `Send exactly ${CONFIG.PAYMENT_AMOUNT} USDC on Base to access yields.`,
         accepts: [{
           scheme: 'exact',
-          network: CONFIG.NETWORK,
-          asset: CONFIG.PAYMENT_ASSET,
-          maxAmountRequired: CONFIG.PAYMENT_AMOUNT,
+          network: CONFIG.NETWORK_CAIP2,               // "eip155:8453"
+          amount: CONFIG.PAYMENT_AMOUNT_ATOMIC,        // "10000000"
           payTo: CONFIG.PAYMENT_ADDRESS,
-          description: CONFIG.API_DESCRIPTION
+          asset: CONFIG.USDC_ADDRESS_BASE,
+          maxTimeoutSeconds: CONFIG.MAX_TIMEOUT_SECONDS,
+          mimeType: 'application/json',
+          resource: {
+            url: url.origin + '/',
+            description: CONFIG.API_DESCRIPTION
+          }
         }]
       }), {
         status: 402,
@@ -175,7 +168,7 @@ export default {
       });
     }
 
-    // Payment header present → verify
+    // Payment present → verify
     try {
       const payment = JSON.parse(payHeader);
 
@@ -195,18 +188,16 @@ export default {
         });
       }
 
-      // Payment verified → return content (yields JSON + optional HTML page)
-      const responseBody = JSON.stringify(YIELD_DATA);
-      const responseHeaders = { ...cors, 'Content-Type': 'application/json' };
-
-      // Optional: also serve HTML if the request seems browser-like (Accept header)
+      // Verified → serve content
       if (req.headers.get('Accept')?.includes('text/html')) {
         return new Response(HTML_PAGE, {
           headers: { ...cors, 'Content-Type': 'text/html' }
         });
       }
 
-      return new Response(responseBody, { headers: responseHeaders });
+      return new Response(JSON.stringify(YIELD_DATA), {
+        headers: { ...cors, 'Content-Type': 'application/json' }
+      });
 
     } catch (e) {
       return new Response(JSON.stringify({
