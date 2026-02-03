@@ -170,9 +170,15 @@ export default {
     if (path === '/') {
       const pay = req.headers.get('X-Payment');
       if (!pay) {
-        return new Response(HTML_PAGE, {
-          headers: { ...cors, 'Content-Type': 'text/html' }
-        });
+               return new Response(JSON.stringify({ error: 'invalid' }), { status: 402 });
+      } catch {
+        return new Response(JSON.stringify({ error: 'bad header' }), { status: 400 });
+      }
+    }
+
+    return new Response(JSON.stringify({ error: '404' }), { status: 404 });
+  }
+};
       }
       try {
     }
