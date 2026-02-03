@@ -119,7 +119,7 @@ export default {
       return new Response(null, { headers: cors });
     }
 
-    // Legacy / per-resource info endpoint (still useful)
+    // Legacy per-resource info (optional but useful)
     if (path === '/x402-info') {
       return new Response(JSON.stringify({
         x402Version: 1,
@@ -136,34 +136,14 @@ export default {
       }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    // x402 Discovery Document (recommended well-known path)
+    // Discovery document
     if (path === '/.well-known/x402') {
       return new Response(JSON.stringify({
         version: 1,
         resources: [
-          "https://" + url.host + "/"
+          url.origin + '/'
         ],
-        ownershipProofs: [], // add signatures here when you implement ownership proof
-        instructions: [
-          "# YieldAgent API",
-          "",
-          "Pay **0.01 USDC** on **Base** to unlock current USDC yield opportunities.",
-          "",
-          "## How to use",
-          "1. Send exactly 0.01 USDC to the displayed address",
-          "2. Get the transaction hash",
-          "3. Use the \"Unlock Yields\" button and paste the tx hash",
-          "",
-          "## Payment address",
-          CONFIG.PAYMENT_ADDRESS,
-          "",
-          "## Important",
-          "- Only payments of **exactly 0.01 USDC** are accepted",
-          "- Transaction must be on **Base** network",
-          "- Yields are informational only – always DYOR",
-          "",
-          "Questions? Reach out via X or Discord (community channels)."
-        ].join('\n')
+        instructions: "# YieldAgent\n\nPay **0.01 USDC** on **Base** to unlock current USDC yield opportunities.\n\n1. Send exactly 0.01 USDC to the address shown\n2. Get the transaction hash from your wallet\n3. Paste it in the prompt on the page\n\nAlways verify on-chain data yourself. Yields are approximate and change frequently."
       }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
@@ -176,12 +156,26 @@ export default {
 
     const payHeader = req.headers.get('X-Payment');
 
+    // No valid payment header → return 402 Payment Required with details
     if (!payHeader) {
-      return new Response(HTML_PAGE, {
-        headers: { ...cors, 'Content-Type': 'text/html' }
+      return new Response(JSON.stringify({
+        error: 'Payment Required',
+        message: `Send exactly ${CONFIG.PAYMENT_AMOUNT} ${CONFIG.PAYMENT_ASSET} on ${CONFIG.NETWORK} to access this resource.`,
+        accepts: [{
+          scheme: 'exact',
+          network: CONFIG.NETWORK,
+          asset: CONFIG.PAYMENT_ASSET,
+          maxAmountRequired: CONFIG.PAYMENT_AMOUNT,
+          payTo: CONFIG.PAYMENT_ADDRESS,
+          description: CONFIG.API_DESCRIPTION
+        }]
+      }), {
+        status: 402,
+        headers: { ...cors, 'Content-Type': 'application/json' }
       });
     }
 
+    // Payment header present → verify
     try {
       const payment = JSON.parse(payHeader);
 
@@ -201,9 +195,18 @@ export default {
         });
       }
 
-      return new Response(JSON.stringify(YIELD_DATA), {
-        headers: { ...cors, 'Content-Type': 'application/json' }
-      });
+      // Payment verified → return content (yields JSON + optional HTML page)
+      const responseBody = JSON.stringify(YIELD_DATA);
+      const responseHeaders = { ...cors, 'Content-Type': 'application/json' };
+
+      // Optional: also serve HTML if the request seems browser-like (Accept header)
+      if (req.headers.get('Accept')?.includes('text/html')) {
+        return new Response(HTML_PAGE, {
+          headers: { ...cors, 'Content-Type': 'text/html' }
+        });
+      }
+
+      return new Response(responseBody, { headers: responseHeaders });
 
     } catch (e) {
       return new Response(JSON.stringify({
