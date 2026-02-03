@@ -1,37 +1,34 @@
 /**
- * Base x402 Yield Agent - Micropayment-gated USDC yields on Base
- * Pay 0.01 USDC → unlock current yields
- * Improved version: real-ish rates (Feb 2026), basic tx verification, cleaner code
+ * Base x402 Yield Agent - Pay 0.01 USDC to unlock USDC yields on Base
+ * Improved: basic tx verification, realistic Feb 2026 yields
  */
 
 const CONFIG = {
-  PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1', // ← CHANGE IF NEEDED
+  PAYMENT_ADDRESS: '0x97d794dB5F8B6569A7fdeD9DF57648f0b464d4F1',
   PAYMENT_AMOUNT: '0.01',
   PAYMENT_ASSET: 'USDC',
   NETWORK: 'base',
   TIMEOUT_SECONDS: 3600,
-  API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho vaults, Moonwell, etc.',
-  API_VERSION: 1,
-  // Use a public Base RPC (or your Alchemy/Infura key in production)
-  RPC_URL: 'https://mainnet.base.org', // or 'https://base-mainnet.g.alchemy.com/v2/YOUR_KEY'
+  API_DESCRIPTION: 'Live USDC yields on Base: Aave, Morpho, Moonwell, etc.',
+  RPC_URL: 'https://mainnet.base.org', // Replace with Alchemy/Infura for reliability in prod
 };
 
 const YIELD_DATA = {
   success: true,
   data: {
     opportunities: [
-      { id: 1, protocol: "Morpho (Steakhouse USDC)", apy: "4.0–4.6%", risk: "Low-Medium", tvl: "~$400M+", asset: "USDC", note: "Curated vault, incl. incentives" },
-      { id: 2, protocol: "Aave V3",                   apy: "3.6–3.9%", risk: "Low",        tvl: "~$350M",  asset: "USDC", note: "Variable supply APY" },
-      { id: 3, protocol: "Moonwell Flagship (Morpho)",apy: "4.3–4.6%", risk: "Low-Medium", tvl: "~$30–40M",asset: "USDC", note: "Vault with WELL + MORPHO rewards" },
-      { id: 4, protocol: "Morpho Blue (various)",     apy: "3.5–4.5%", risk: "Low",        tvl: "Varies",  asset: "USDC", note: "Peer-to-peer optimized lending" },
-      // Removed Pendle/Aerodrome/Compound as they don't currently show high plain USDC yields on Base
+      { id: 1, protocol: "Morpho (Steakhouse USDC)", apy: "4.0–4.6%", risk: "Low-Medium", tvl: "~$400M+", asset: "USDC", note: "Curated vault with incentives" },
+      { id: 2, protocol: "Aave V3", apy: "3.6–3.9%", risk: "Low", tvl: "~$350M", asset: "USDC", note: "Variable supply APY" },
+      { id: 3, protocol: "Moonwell Flagship (Morpho)", apy: "4.3–4.6%", risk: "Low-Medium", tvl: "~$30–40M", asset: "USDC", note: "With WELL + MORPHO rewards" },
+      { id: 4, protocol: "Morpho Blue (various)", apy: "3.5–4.5%", risk: "Low", tvl: "Varies", asset: "USDC", note: "Optimized P2P lending" },
     ],
     network: "Base",
     lastUpdated: new Date().toISOString(),
-    disclaimer: "Yields fluctuate; always DYOR. Data approximate from public sources."
+    disclaimer: "Yields fluctuate; always DYOR."
   }
 };
 
+// HTML paywall page (unchanged except minor JS fix)
 const HTML_PAGE = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -84,42 +81,38 @@ const HTML_PAGE = `<!DOCTYPE html>
       document.querySelector('.copy-btn').onclick = copyAddress;
 
       async function tryAgent() {
-        const hash = prompt('Enter your Base tx hash (0.01 USDC payment):');
+        const hash = prompt('Enter your Base tx hash:');
         if (!hash) return;
         const res = await fetch('/', { 
-          method: 'GET',
           headers: { 'X-Payment': JSON.stringify({ txHash: hash, amount: '0.01' }) } 
         });
         if (res.ok) {
           const data = await res.json();
           const out = data.data.opportunities.map(o => 
-            `<div class="yield-item"><strong>${o.protocol}</strong>: ${o.apy} (TVL: ${o.tvl}) — ${o.note || ''}</div>`
+            \`<div class="yield-item"><strong>\${o.protocol}</strong>: \${o.apy} (TVL: \${o.tvl}) — \${o.note || ''}</div>\`
           ).join('');
-          document.body.innerHTML += `<div style="margin-top:20px; text-align:center;">${out}</div>`;
+          document.body.innerHTML += \`<div style="margin-top:20px; text-align:center;">\${out}</div>\`;
         } else {
-          alert('Payment not verified or invalid.');
+          alert('Payment verification failed.');
         }
       }
     </script>
   </div>
 </body>
-</html>
-`;
+</html>`;
 
 export default {
-  async fetch(req, env, ctx) {
+  async fetch(req) {
     const url = new URL(req.url);
     const path = url.pathname;
 
     const cors = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'X-Payment, Content-Type'
+      'Access-Control-Allow-Headers': 'X-Payment'
     };
 
-    if (req.method === 'OPTIONS') {
-      return new Response(null, { headers: cors });
-    }
+    if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
 
     if (path === '/x402-info') {
       return new Response(JSON.stringify({
@@ -137,58 +130,35 @@ export default {
       }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    if (path === '/') {
-      const payHeader = req.headers.get('X-Payment');
-
-      if (!payHeader) {
-        // No payment → show paywall page
-        return new Response(HTML_PAGE, {
-          headers: { ...cors, 'Content-Type': 'text/html' }
-        });
-      }
-
-      try {
-        const payment = JSON.parse(payHeader);
-        if (payment.amount !== CONFIG.PAYMENT_AMOUNT || !payment.txHash) {
-          return new Response(JSON.stringify({ error: 'Invalid payment details' }), { 
-            status: 402, 
-            headers: cors 
-          });
-        }
-
-        // Basic on-chain verification (improve in prod with event logs / viem)
-        const verified = await verifyTxHash(payment.txHash);
-        if (!verified) {
-          return new Response(JSON.stringify({ error: 'Payment not found or invalid' }), { 
-            status: 402, 
-            headers: cors 
-          });
-        }
-
-        // Success → return yields
-        return new Response(JSON.stringify(YIELD_DATA), {
-          headers: { ...cors, 'Content-Type': 'application/json' }
-        });
-
-      } catch (e) {
-        return new Response(JSON.stringify({ error: 'Bad request', details: e.message }), { 
-          status: 400, 
-          headers: cors 
-        });
-      }
+    if (path !== '/') {
+      return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: cors });
     }
 
-    return new Response(JSON.stringify({ error: 'Not found' }), { 
-      status: 404, 
-      headers: cors 
-    });
+    const payHeader = req.headers.get('X-Payment');
+
+    if (!payHeader) {
+      return new Response(HTML_PAGE, { headers: { ...cors, 'Content-Type': 'text/html' } });
+    }
+
+    try {
+      const payment = JSON.parse(payHeader);
+      if (payment.amount !== CONFIG.PAYMENT_AMOUNT || !payment.txHash) {
+        return new Response(JSON.stringify({ error: 'Invalid payment' }), { status: 402, headers: cors });
+      }
+
+      const verified = await verifyTxHash(payment.txHash);
+      if (!verified) {
+        return new Response(JSON.stringify({ error: 'Payment not confirmed' }), { status: 402, headers: cors });
+      }
+
+      return new Response(JSON.stringify(YIELD_DATA), { headers: { ...cors, 'Content-Type': 'application/json' } });
+
+    } catch (e) {
+      return new Response(JSON.stringify({ error: 'Bad request', details: e.message }), { status: 400, headers: cors });
+    }
   }
 };
 
-/**
- * Very basic tx verification: check if tx exists and transferred ~0.01 USDC to PAYMENT_ADDRESS
- * In production: use viem/public client, parse Transfer event, check amount exactly, memo if used, etc.
- */
 async function verifyTxHash(txHash) {
   try {
     const response = await fetch(CONFIG.RPC_URL, {
@@ -203,11 +173,9 @@ async function verifyTxHash(txHash) {
     });
 
     const json = await response.json();
-    if (json.result) {
-      // Very naive check — improve with full log parsing for ERC20 Transfer event
-      // Look for logs with USDC contract → from/to/value
-      // For now: assume if receipt exists and status ok → probably paid (demo only!)
-      return json.result.status === '0x1'; // success
+    if (json.result && json.result.status === '0x1') {
+      // Basic success check; improve with full Transfer log parsing in prod
+      return true;
     }
     return false;
   } catch {
